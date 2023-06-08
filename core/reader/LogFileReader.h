@@ -103,6 +103,8 @@ public:
 
     virtual int32_t LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount);
 
+    int32_t AlignLastCharacter(char* buffer, int32_t size);
+
     virtual ~LogFileReader();
 
     std::string GetRegion() const { return mRegion; }

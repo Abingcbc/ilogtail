@@ -1621,6 +1621,7 @@ void LogFileReader::ReadUTF8(char*& bufferptr, size_t* size, int64_t end, bool& 
     mLastReadPos = mLastFilePos + nbytes;
     LOG_DEBUG(sLogger, ("read bytes", nbytes)("last read pos", mLastReadPos));
     moreData = (nbytes == BUFFER_SIZE);
+    READ_BYTE = nbytes = AlignLastCharacter(bufferptr, nbytes);
     bool adjustFlag = false;
     while (nbytes > 0 && bufferptr[nbytes - 1] != '\n') {
         nbytes--;
@@ -1663,6 +1664,7 @@ void LogFileReader::ReadGBK(char*& bufferptr, size_t* size, int64_t end, bool& m
     size_t READ_BYTE = getNextReadSize(end, fromCpt);
     char* gbkBuffer = new char[READ_BYTE + 1];
     size_t readCharCount = ReadFile(mLogFileOp, gbkBuffer, READ_BYTE, mLastFilePos, &truncateInfo);
+    readCharCount = AlignLastCharacter(gbkBuffer, readCharCount);
     mLastReadPos = mLastFilePos + readCharCount;
     size_t originReadCount = readCharCount;
     moreData = (readCharCount == BUFFER_SIZE);
@@ -1844,6 +1846,59 @@ int32_t LogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& roll
             endPs = begPs;
         }
         begPs--;
+    }
+    return 0;
+}
+
+int32_t LogFileReader::AlignLastCharacter(char* buffer, int32_t size) {
+    int endPs = size - 1;
+    int n = 0;
+    if (buffer[endPs] == '\n') {
+        return size;
+    }
+    if (mFileEncoding == ENCODING_GBK) {
+        // GBK encoding rules:
+        // 1. The top bit of the first byte is 1.
+        // 2. The top bit of the second byte or single byte character is 0.
+        if ((buffer[endPs] & 0x80) == 1) {
+            return endPs - 1;
+        } else {
+            return size;
+        }
+    } else {
+        // UTF8 encoding rules:
+        // 1. For single byte character, the top bit is 0.
+        // 2. For N (N > 1) bytes character, the top N bit of the first byte is 1. The top 2 bits of the following bytes are 10.
+        while (endPs >= 0) {
+            char ch = buffer[endPs];
+            if ((ch & 0x80) == 0) {
+                n = 1;
+                break;
+            } else if ((ch & 0xE0) == 0xC0) {
+                n = 2;
+                break;
+            } else if ((ch & 0xF0) == 0xE0) {
+                n = 3;
+                break;
+            } else if ((ch & 0xF8) == 0xF0) {
+                n = 4;
+                break;
+            } else if ((ch & 0xFC) == 0xF8) {
+                n = 5;
+                break;
+            } else if ((ch & 0xFE) == 0xFC) {
+                n = 6;
+                break;
+            }
+            endPs--;
+        }
+        LOG_WARNING(sLogger, ("endPs", endPs)("n", n)("size", size));
+        if (endPs - 1 + n >= size) {
+            buffer[endPs] = '\0';
+            return endPs;
+        } else {
+            return size;
+        }
     }
     return 0;
 }
