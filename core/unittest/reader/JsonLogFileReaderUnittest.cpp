@@ -267,6 +267,21 @@ void JsonLogFileReaderUnittest::TestLastMatchedLine() {
         APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
+    { // case single line, buffer size not big enough
+        std::string line1 = R"({"key": "first value"})";
+        std::string line2 = R"({"key": "second value"})";
+        std::string line3 = R"({"key": "third)";
+        // TODO
+        std::string expectMatch = line1 + '\0' + line2 + '\0';
+        std::string testLog = line1 + '\n' + line2 + '\n' + line3;
+        int32_t rollbackLineFeedCount = 0;
+        int32_t matchSize
+            = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
+        APSARA_TEST_EQUAL_FATAL(expectMatch.size(), matchSize);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
+        // TODO
+        APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
+    }
     { // case multi line
         std::vector<int32_t> index;
         std::string firstLog = R"({
@@ -283,6 +298,22 @@ void JsonLogFileReaderUnittest::TestLastMatchedLine() {
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
         APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
+    }
+    { // case multi line, buffer size not enough
+        std::vector<int32_t> index;
+        std::string firstLog = R"({
+    "key": "first value"
+})";
+        std::string secondLog = R"({
+    "key": "second)";
+        std::string expectMatch = firstLog + '\0';
+        std::string testLog = firstLog + '\n' + secondLog + '\n';
+        int32_t rollbackLineFeedCount = 0;
+        int32_t matchSize
+            = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
+        APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(2, rollbackLineFeedCount);
     }
     { // case partial json, rollback all
         std::string testLog = "{partial json\npartial json\npartial json\n";
