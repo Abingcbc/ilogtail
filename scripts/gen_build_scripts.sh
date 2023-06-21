@@ -98,6 +98,7 @@ function generateCopyScript() {
   elif [ $CATEGORY = "core" ]; then
     echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR' >>$COPY_SCRIPT_FILE
     echo 'docker cp "$id":/src/core/build/plugin/libPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":/src/core/build/unittest $BINDIR/unittest' >>$COPY_SCRIPT_FILE
   else
     echo 'docker cp "$id":/src/'${OUT_DIR}'/libPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
     echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR' >>$COPY_SCRIPT_FILE
@@ -106,6 +107,8 @@ function generateCopyScript() {
   echo 'echo -e "{\n}" > $BINDIR/ilogtail_config.json' >>$COPY_SCRIPT_FILE
   echo 'mkdir -p $BINDIR/user_yaml_config.d' >>$COPY_SCRIPT_FILE
   echo 'docker rm -v "$id"' >>$COPY_SCRIPT_FILE
+  echo 'echo @@@@@@@@@@@@@@@@@@@@@@@@' >>$COPY_SCRIPT_FILE
+  echo 'echo $BINDIR' >>$COPY_SCRIPT_FILE
 }
 
 mkdir -p $GENERATED_HOME
