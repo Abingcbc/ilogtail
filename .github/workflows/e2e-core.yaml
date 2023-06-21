@@ -15,11 +15,11 @@
 name: E2E Core Test
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - 1.*
+  workflow_run:
+    workflows: ["Build", "Build Core"]
+    types:
+      - completed
+
 jobs:
   CI:
     runs-on: ${{ matrix.runner }}-latest

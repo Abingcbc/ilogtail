@@ -20,6 +20,8 @@ on:
     branches:
       - main
       - 1.*
+  workflow_call:
+
 jobs:
   CI:
     runs-on: ${{ matrix.runner }}
