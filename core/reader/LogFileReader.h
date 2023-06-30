@@ -94,6 +94,30 @@ public:
         if (reg.empty() == false && reg != ".*") {
             mLogBeginRegPtr = new boost::regex(reg.c_str());
         }
+    }    
+    
+    void SetLogContinueRegex(const std::string& reg) {
+        if (mLogContinueRegPtr != NULL) {
+            delete mLogContinueRegPtr;
+            mLogContinueRegPtr = NULL;
+        }
+        if (reg.empty() == false && reg != ".*") {
+            mLogContinueRegPtr = new boost::regex(reg.c_str());
+        }
+    }
+
+    void SetLogEndRegex(const std::string& reg) {
+        if (mLogEndRegPtr != NULL) {
+            delete mLogEndRegPtr;
+            mLogEndRegPtr = NULL;
+        }
+        if (reg.empty() == false && reg != ".*") {
+            mLogEndRegPtr = new boost::regex(reg.c_str());
+        }
+    }
+
+    bool IsMultiLine() {
+        return mLogBeginRegPtr != NULL || mLogContinueRegPtr != NULL || mLogEndRegPtr != NULL;
     }
 
     std::string GetTopicName(const std::string& topicConfig, const std::string& path);
@@ -353,6 +377,8 @@ protected:
     std::string mTopicName;
     time_t mLastUpdateTime;
     boost::regex* mLogBeginRegPtr;
+    boost::regex* mLogContinueRegPtr;
+    boost::regex* mLogEndRegPtr;
     FileEncoding mFileEncoding;
     bool mDiscardUnmatch;
     LogType mLogType;

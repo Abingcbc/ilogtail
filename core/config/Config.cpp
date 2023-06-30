@@ -582,6 +582,8 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
         reader->SetConfigName(mConfigName);
         reader->SetRegion(mRegion);
         reader->SetLogBeginRegex(STRING_DEEP_COPY(mLogBeginReg));
+        reader->SetLogContinueRegex(STRING_DEEP_COPY(mLogContinueReg));
+        reader->SetLogEndRegex(STRING_DEEP_COPY(mLogEndReg));
         if (forceFromBeginning)
             reader->SetReadFromBeginning();
         reader->SetDevInode(devInode);

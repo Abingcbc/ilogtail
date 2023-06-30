@@ -426,6 +426,8 @@ LogFileReader::LogFileReader(const string& projectName,
     mLastFilePos = 0;
     mLastFileSize = 0;
     mLogBeginRegPtr = NULL;
+    mLogContinueRegPtr = NULL;
+    mLogEndRegPtr = NULL;
     mDiscardUnmatch = discardUnmatch;
     mLastUpdateTime = time(NULL);
     mLastEventTime = mLastUpdateTime;
@@ -478,6 +480,8 @@ LogFileReader::LogFileReader(const std::string& projectName,
         mTopicName = GetTopicName(topicFormat, mLogPath);
     mFileEncoding = fileEncoding;
     mLogBeginRegPtr = NULL;
+    mLogContinueRegPtr = NULL;
+    mLogEndRegPtr = NULL;
     mDiscardUnmatch = discardUnmatch;
     mLastUpdateTime = time(NULL);
     mLastEventTime = mLastUpdateTime;
@@ -1613,17 +1617,8 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData) 
     LOG_DEBUG(sLogger, ("read bytes", nbytes)("last read pos", mLastReadPos));
     moreData = (nbytes == BUFFER_SIZE);
 
-    // before: bufferptr[nbytes-1] == ?
-    // after: bufferptr[nbytes-1] == '\n' or nbytes == READ_BYTE
-    bool adjustFlag = false;
-    while (nbytes > 0 && sbuffer.data[nbytes - 1] != '\n') {
-        nbytes--;
-        adjustFlag = true;
-    }
-    if ((nbytes > 0 && (adjustFlag || moreData) && mLogBeginRegPtr) || mLogType == JSON_LOG) {
-        int32_t rollbackLineFeedCount;
-        nbytes = LastMatchedLine(sbuffer.data, nbytes, rollbackLineFeedCount);
-    }
+    int32_t rollbackLineFeedCount;
+    nbytes = LastMatchedLine(sbuffer.data, nbytes, rollbackLineFeedCount);
 
     if (nbytes == 0) {
         if (moreData) { // excessively long line without '\n' or multiline begin
@@ -1829,11 +1824,30 @@ LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& file
 }
 
 int32_t LogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount) {
+    if (mLogBeginRegPtr != nullptr)
+        std::cout << "mLogBeginRegPtr " << *mLogBeginRegPtr << std::endl;
+    if (mLogContinueRegPtr != nullptr)
+        std::cout << "mLogContinueRegPtr " << *mLogContinueRegPtr << std::endl;
+    if (mLogEndRegPtr != nullptr)
+        std::cout << "mLogEndRegPtr " << *mLogEndRegPtr << std::endl;
     int endPs = size - 1; // buffer[size] = 0 , buffer[size-1] = '\n'
     rollbackLineFeedCount = 0;
-    if (mLogBeginRegPtr == nullptr && buffer[endPs] == '\n') {
-        return size;
+    // Single line rollback
+    if (!IsMultiLine()) {
+        while (endPs >= 0 && buffer[endPs] != '\n') {
+            endPs--;
+        }
+        // one line and buffer size is not enough, force split
+        if (endPs < 0) {
+            endPs = size - 1;
+        }
+        if (endPs != size - 1) {
+            ++rollbackLineFeedCount;
+        }
+        buffer[endPs + 1] = '\0';
+        return endPs + 1;
     }
+    // Multi line rollback
     int begPs = size - 2;
     std::string exception;
     while (begPs >= 0) {
@@ -1841,9 +1855,32 @@ int32_t LogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& roll
             ++rollbackLineFeedCount;
             char temp = buffer[endPs];
             buffer[endPs] = '\0';
-            // ignore regex match fail, no need log here
-            if (mLogBeginRegPtr == nullptr
-                || BoostRegexMatch(buffer + begPs + 1, endPs - begPs - 1, *mLogBeginRegPtr, exception)) {
+            if (mLogContinueRegPtr != nullptr && BoostRegexMatch(buffer + begPs + 1, endPs - begPs - 1, *mLogContinueRegPtr, exception)) {
+                std::cout << "Match continue regex" << std::endl;
+                // rollback until one line unmatch continue regex
+                while (begPs >= 0) {
+                    if (buffer[begPs] == '\n') {
+                        if (!BoostRegexMatch(buffer + begPs + 1, endPs - begPs - 1, *mLogContinueRegPtr, exception)) {
+                            break;
+                        }
+                        endPs = begPs;
+                    }
+                    begPs--;
+                }
+                // if begin pattern, then rollback current line
+                if (mLogBeginRegPtr != nullptr && BoostRegexMatch(buffer + begPs + 1, endPs - begPs - 1, *mLogBeginRegPtr, exception)) {
+                    buffer[begPs + 1] = '\0';
+                    return begPs + 1;
+                } else { // only rollback line after
+                    buffer[endPs + 1] = '\0';
+                    return endPs + 1;
+                }
+            } else if (mLogEndRegPtr != nullptr && BoostRegexMatch(buffer + begPs + 1, endPs - begPs - 1, *mLogEndRegPtr, exception)) {
+                std::cout << "Match end regex" << std::endl;
+                buffer[endPs + 1] = '\0';
+                return endPs + 1;
+            } else if (mLogBeginRegPtr != nullptr && BoostRegexMatch(buffer + begPs + 1, endPs - begPs - 1, *mLogBeginRegPtr, exception)) {
+                std::cout << "Match begin regex" << std::endl;
                 buffer[begPs + 1] = '\0';
                 return begPs + 1;
             }
@@ -1862,6 +1899,14 @@ LogFileReader::~LogFileReader() {
     if (mLogBeginRegPtr != NULL) {
         delete mLogBeginRegPtr;
         mLogBeginRegPtr = NULL;
+    }
+    if (mLogContinueRegPtr != NULL) {
+        delete mLogContinueRegPtr;
+        mLogContinueRegPtr = NULL;
+    }
+    if (mLogEndRegPtr != NULL) {
+        delete mLogEndRegPtr;
+        mLogEndRegPtr = NULL;
     }
     LOG_INFO(sLogger,
              ("try to close the file and destruct the corresponding log reader, project",

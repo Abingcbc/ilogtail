@@ -15,6 +15,7 @@
 #include "unittest/Unittest.h"
 #include <stdio.h>
 #include <fstream>
+#include "reader/ApsaraLogFileReader.h"
 #include "reader/CommonRegLogFileReader.h"
 #include "reader/SourceBuffer.h"
 #include "common/RuntimeUtil.h"
@@ -188,11 +189,10 @@ void LogFileReaderUnittest::TestReadGBK() {
         expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
         // second read
+        LogBuffer logBuffer2;
         reader.ReadGBK(logBuffer, fileSize, moreData);
         APSARA_TEST_FALSE_FATAL(moreData);
-        expectedPart = expectedContent.get();
-        expectedPart = expectedPart.substr(expectedPart.rfind("iLogtail"));
-        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_STREQ_FATAL(NULL, logBuffer2.rawBuffer.data());
     }
 }
 
@@ -269,9 +269,7 @@ void LogFileReaderUnittest::TestReadUTF8() {
         reader.ReadUTF8(logBuffer, fileSize, moreData);
         APSARA_TEST_TRUE_FATAL(moreData);
         std::string expectedPart(expectedContent.get());
-        // TODO: Should read util the last matched line, but read the whole buffer
-        // expect: expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
-        expectedPart = expectedPart.substr(0, LogFileReader::BUFFER_SIZE);
+        expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
     }
     { // read twice
@@ -308,6 +306,12 @@ void LogFileReaderUnittest::TestReadUTF8() {
         // TODO: expect: expectedPart = expectedPart.substr(expectedPart.rfind("iLogtail"));
         expectedPart = expectedPart.substr(fileSize - 11);
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        // second read
+        LogBuffer logBuffer2;
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        expectedPart = expectedContent.get();
+        APSARA_TEST_STREQ_FATAL(NULL, logBuffer2.rawBuffer.data());
     }
 }
 
@@ -322,6 +326,10 @@ void LogFileReaderUnittest::TestLastMatchedLine() {
                                          groupTopic);
     const std::string LOG_BEGIN_TIME = "2012-12-12上午 : ";
     const std::string LOG_BEGIN_REGEX = R"(\d{4}-\d{2}-\d{2}上午.*)";
+    const std::string LOG_CONTINUE_STRING = "  at";
+    const std::string LOG_CONTINUE_REGEX = R"(  at.*)";
+    const std::string LOG_END_STRING = "  xxx more";
+    const std::string LOG_END_REGEX = R"(.*more$)";
     { // case single line
         std::string line1 = "first.";
         std::string line2 = "second.";
@@ -388,10 +396,18 @@ void LogFileReaderUnittest::TestLastMatchedLine() {
         APSARA_TEST_EQUAL_FATAL(3, rollbackLineFeedCount);
     }
     { // case multi line not match
-        std::string testLog2 = "log begin does not match.\nlog begin does not match.\nlog begin does not match.\n";
+        std::string testLog = "log begin does not match.\nlog begin does not match.\nlog begin does not match.\n";
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize
-            = logFileReader.LastMatchedLine(const_cast<char*>(testLog2.data()), testLog2.size(), rollbackLineFeedCount);
+            = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
+        APSARA_TEST_EQUAL_FATAL(0, matchSize);
+        APSARA_TEST_EQUAL_FATAL(3, rollbackLineFeedCount);
+    }
+    { // case multi line not match, buffer size not big enough
+        std::string testLog = "log begin does not match.\nlog begin does not match.\nlog begin does not";
+        int32_t rollbackLineFeedCount = 0;
+        int32_t matchSize
+            = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(0, matchSize);
         APSARA_TEST_EQUAL_FATAL(3, rollbackLineFeedCount);
     }
@@ -560,6 +576,221 @@ void LogSplitUnittest::TestLogSplitMultiLineAllNotmatchNoDiscard() {
     APSARA_TEST_EQUAL_FATAL(1UL, index.size());
     APSARA_TEST_EQUAL_FATAL(testLog, index[0].to_string());
 }
+
+class ParseLogLineUnittest : public ::testing::Test {
+public:
+    void TestParseLogLineApsara();
+    void TestParseLogLineCommonReg();
+    void TestParseLogLineDelimiter();
+    void TestParseLogLineJson();
+    const std::string LOG_BEGIN_TIME = "[2013-10-31 21:03:49]";
+    const std::string LOG_BEGIN_REGEX = "\\[([^\\]]+)\\]\\s*(.*)";
+
+    static void SetUpTestCase() {
+        BOOL_FLAG(ilogtail_discard_old_data) = false;
+    }
+};
+
+UNIT_TEST_CASE(ParseLogLineUnittest, TestParseLogLineApsara);
+UNIT_TEST_CASE(ParseLogLineUnittest, TestParseLogLineCommonReg);
+UNIT_TEST_CASE(ParseLogLineUnittest, TestParseLogLineDelimiter);
+UNIT_TEST_CASE(ParseLogLineUnittest, TestParseLogLineJson);
+
+void ParseLogLineUnittest::TestParseLogLineApsara() {
+    ApsaraLogFileReader logFileReader(
+        "project", "logstore", "dir", "file", INT32_FLAG(default_tail_limit_kb), "", "", ENCODING_UTF8, false, false);
+    { // case multiline, can be parsed
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        std::string testLog =  "[2013-03-13 18:14:57.365716]\t[ERROR]\t[12835]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\tParseWhiteListOK:{\n\"sys/"
+        "pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_TRUE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 227);
+    }
+    { // case multiline, cannot be parsed, discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = true;
+        std::string testLog =  "2013-03-13 18:14:57.365716\tERROR\t[12835]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\tParseWhiteListOK:{\n\"sys/"
+        "pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 0);
+    }
+    { // case multiline, cannot be parsed, not discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = false;
+        std::string testLog =  "2013-03-13 18:14:57.365716\tERROR\t[12835]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\tParseWhiteListOK:{\n\"sys/"
+        "pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 189);
+    }
+}
+
+void ParseLogLineUnittest::TestParseLogLineCommonReg() {
+    CommonRegLogFileReader logFileReader(
+        "project", "logstore", "dir", "file", INT32_FLAG(default_tail_limit_kb), "", "", "", ENCODING_UTF8, false);
+    logFileReader.AddUserDefinedFormat(LOG_BEGIN_REGEX, "time");
+    { // case multiline, can be parsed
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        std::string testLog = LOG_BEGIN_TIME + "first\nsecond";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_TRUE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 28);
+    }
+    { // case multiline, cannot be parse, discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = true;
+        std::string testLog = "2013-10-31 21:03:49 first\nsecond";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 0);
+    }
+    { // case multiline, cannot be parse, not discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = false;
+        std::string testLog = "2013-10-31 21:03:49 first\nsecond";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 48);
+    }
+}
+
+void ParseLogLineUnittest::TestParseLogLineDelimiter() {
+    DelimiterLogFileReader logFileReader("project",
+                                         "logstore",
+                                         "dir",
+                                         "file",
+                                         INT32_FLAG(default_tail_limit_kb),
+                                         "",
+                                         "",
+                                         "",
+                                         ENCODING_UTF8,
+                                         ",",
+                                         '\'',
+                                         false,
+                                         false,
+                                         false,
+                                         false,
+                                         false);
+    std::vector<std::string> columnKeys = {"time", "method", "url", "request_time"};
+    logFileReader.SetColumnKeys(columnKeys, "time");
+    { // case multiline, can be parsed
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        std::string testLog = "2013-10-31 21:03:49,POST,PutData?Category\n=YunOsAccountOpLog\n,0.024";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_TRUE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 109);
+    }
+    { // case multiline, cannot be parsed, discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = true;
+        std::string testLog = "2013-10-31 21:03:49|POST|PutData?Category\n=YunOsAccountOpLog\n|0.024";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 0);
+    }
+    { // case multiline, cannot be parsed, discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = false;
+        std::string testLog = "2013-10-31 21:03:49|POST|PutData?Category\n=YunOsAccountOpLog\n|0.024";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 83);
+    }
+}
+
+void ParseLogLineUnittest::TestParseLogLineJson() {
+    JsonLogFileReader logFileReader("project",
+                                    "logstore",
+                                    "dir",
+                                    "file",
+                                    INT32_FLAG(default_tail_limit_kb),
+                                    "",
+                                    "",
+                                    "",
+                                    ENCODING_UTF8,
+                                    false,
+                                    false);
+    { // case multiline, can be parsed
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        std::string testLog = "{\n"
+                              "\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\n"
+                              "\"time\": \"07/Jul/2022:10:30:28\"\n}";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_TRUE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 86);
+    }
+    { // case multiline, cannot be parsed, discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = true;
+        std::string testLog = "{\n"
+                              "\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\n"
+                              "\"time\": \n}";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 0);
+    }
+    { // case multiline, cannot be parsed, not discard
+        sls_logs::LogGroup logGroup;
+        ParseLogError error;
+        time_t lastLogLineTime = 0;
+        std::string lastLogTimeStr = "";
+        uint32_t logGroupSize = 0;
+        logFileReader.mDiscardUnmatch = false;
+        std::string testLog = "{\n"
+                              "\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\n"
+                              "\"time\": \n}";
+        bool successful = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+        APSARA_TEST_FALSE_FATAL(successful);
+        APSARA_TEST_EQUAL_FATAL(logGroupSize, 88);
+    }
+}
+
 
 } // namespace logtail
 
