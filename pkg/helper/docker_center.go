@@ -630,6 +630,7 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 }
 
 func getDockerCenterInstance() *DockerCenter {
+	// 探查哪种容器运行时，只执行一次就可以了
 	onceDocker.Do(func() {
 		logger.Init()
 		// load EnvTags first
@@ -1022,6 +1023,7 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 	dc.refreshLastUpdateMapTime()
 }
 
+// 通过docker client获取所有容器
 func (dc *DockerCenter) fetchAll() error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
@@ -1057,6 +1059,7 @@ func (dc *DockerCenter) fetchAll() error {
 			dc.setLastError(err, "inspect container error "+container.ID)
 		}
 	}
+	// 更新容器信息
 	dc.updateContainers(containerMap)
 
 	return err

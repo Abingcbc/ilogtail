@@ -274,6 +274,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 	return c.enableCRIDiscover || c.enableDockerDiscover || c.enableStaticDiscover
 }
 
+// 定时轮询容器信息
 func (c *ContainerDiscoverManager) TimerFetch() {
 	timerFetch := func() {
 		defer dockerCenterRecover()

@@ -69,6 +69,7 @@ type CRIRuntimeWrapper struct {
 	listContainerStartTime int64 // in nanosecond
 }
 
+// 判断CRI是否可用
 func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
 	// Verify containerd.sock cri valid.
 	if fi, err := os.Stat(criRuntimeEndpoint); err == nil && !fi.IsDir() {
@@ -79,6 +80,7 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
 	return false
 }
 
+// 判断CRI是否可以通信
 func IsCRIStatusValid(criRuntimeEndpoint string) bool {
 	addr, dailer, err := GetAddressAndDialer(criRuntimeEndpoint)
 	if err != nil {
@@ -93,6 +95,7 @@ func IsCRIStatusValid(criRuntimeEndpoint string) bool {
 		return false
 	}
 
+	// 通过K8s的运行时client来和运行时交互
 	client := cri.NewRuntimeServiceClient(conn)
 	// check cri status
 	_, err = client.Status(ctx, &cri.StatusRequest{})
@@ -162,12 +165,14 @@ func newRuntimeServiceClient() (cri.RuntimeServiceClient, error) {
 
 // NewCRIRuntimeWrapper ...
 func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error) {
+	// 创建k8s格式的cri client
 	client, err := newRuntimeServiceClient()
 	if err != nil {
 		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
 		return nil, err
 	}
 
+	// 获取版本，这里和CRI发生了通信，是个耗时操作
 	runtimeVersion, err := getCRIRuntimeVersion(client)
 	if err != nil {
 		return nil, err
@@ -198,6 +203,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	}, nil
 }
 
+// 把cri client获取到的信息转换为docker配置
 // createContainerInfo convert cri container to docker spec to adapt the history logic.
 func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *DockerInfoDetail, sandboxID string, state cri.ContainerState, err error) {
 	ctx, cancel := getContextWithTimeout(time.Second * 10)
@@ -263,6 +269,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 				},
 			},
 		},
+		// container的label塞到config里，pod的label塞到
 		Config: &container.Config{
 			Labels: labels,
 			Image:  image,
@@ -504,6 +511,7 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 	return nil
 }
 
+// 调用cri client获取pod信息
 func (cw *CRIRuntimeWrapper) wrapperK8sInfoByID(sandboxID string, detail *DockerInfoDetail) {
 	ctx, cancel := getContextWithTimeout(time.Second * 10)
 	status, err := cw.client.PodSandboxStatus(ctx, &cri.PodSandboxStatusRequest{
@@ -518,6 +526,7 @@ func (cw *CRIRuntimeWrapper) wrapperK8sInfoByID(sandboxID string, detail *Docker
 	cw.wrapperK8sInfoByLabels(status.GetStatus().GetLabels(), detail)
 }
 
+// 把pod的label塞到detail中
 func (cw *CRIRuntimeWrapper) wrapperK8sInfoByLabels(sandboxLabels map[string]string, detail *DockerInfoDetail) {
 	if detail.K8SInfo == nil || sandboxLabels == nil {
 		return

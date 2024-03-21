@@ -422,6 +422,7 @@ func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
 
 func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
 	var err error
+	// 从缓存map中找到符合条件的容器
 	dockerInfos := helper.GetContainerByAcceptedInfo(
 		sds.IncludeLabel, sds.ExcludeLabel,
 		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
