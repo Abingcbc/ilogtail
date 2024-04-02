@@ -72,6 +72,7 @@ bool Pipeline::Init(Config&& config) {
         const Json::Value& detail = *config.mInputs[i];
         string name = detail["Type"].asString();
         unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(name, to_string(++pluginIndex));
+        // 创建失败说明是go插件
         if (input) {
             Json::Value optionalGoPipeline;
             if (!input->Init(detail, mContext, pluginIndex, i, optionalGoPipeline)) {

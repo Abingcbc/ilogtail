@@ -87,6 +87,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
     LogtailPlugin::GetInstance()->HoldOn(false);
 #endif
 
+    // 处理本次变更导致失效的流水线
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
         iter->second->Stop(true);
@@ -94,6 +95,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         iter->second->RemoveProcessQueue();
         mPipelineNameEntityMap.erase(iter);
     }
+    // 被修改的流水线需要重新构建
     for (auto& config : diff.mModified) {
         auto p = BuildPipeline(std::move(config));
         if (!p) {
@@ -120,6 +122,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
     }
+    // 处理新的流水线
     for (auto& config : diff.mAdded) {
         auto p = BuildPipeline(std::move(config));
         if (!p) {
@@ -251,6 +254,7 @@ void PipelineManager::StopAllPipelines() {
 shared_ptr<Pipeline> PipelineManager::BuildPipeline(Config&& config) {
     shared_ptr<Pipeline> p = make_shared<Pipeline>();
     // only config.mDetail is removed, other members can be safely used later
+    // 初始化流水线
     if (!p->Init(std::move(config))) {
         return nullptr;
     }

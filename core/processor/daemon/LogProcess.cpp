@@ -90,6 +90,7 @@ bool LogProcess::PushBuffer(QueueKey key, size_t inputIndex, PipelineEventGroup&
 
 void LogProcess::HoldOn() {
     LOG_INFO(sLogger, ("process daemon pause", "starts"));
+    // 通过上锁的方式暂停处理
     mAccessProcessThreadRWL.lock();
     while (true) {
         bool allThreadWait = true;
@@ -154,6 +155,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             lastMergeTime = curTime;
         }
 
+        // 更新指标
         if (threadNo == 0 && curTime - lastUpdateMetricTime >= 40) {
             static auto sMonitor = LogtailMonitor::GetInstance();
 

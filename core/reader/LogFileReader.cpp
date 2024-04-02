@@ -270,6 +270,7 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
     mSourceId = LogFileProfiler::mIpAddr + "_" + mReaderConfig.second->GetConfigName() + "_" + mHostLogPath + "_"
         + CalculateRandomUUID();
 
+    // 如果不tail，就从checkpoint开始读
     if (!tailExisted) {
         static CheckPointManager* checkPointManagerPtr = CheckPointManager::Instance();
         // hold on checkPoint share ptr, so this check point will not be delete in this block

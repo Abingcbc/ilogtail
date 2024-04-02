@@ -253,6 +253,7 @@ void Application::Start() {
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
             ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!diff.IsEmpty()) {
+                // 这里会启动流水线
                 PipelineManager::GetInstance()->UpdatePipelines(diff);
             }
             lastConfigCheckTime = curTime;

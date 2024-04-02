@@ -84,6 +84,7 @@ void PluginRegistry::UnloadPlugins() {
 }
 
 unique_ptr<InputInstance> PluginRegistry::CreateInput(const string& name, const string& pluginId) {
+    // 基类PluginInstance转派生类InputInstance
     return unique_ptr<InputInstance>(static_cast<InputInstance*>(Create(INPUT_PLUGIN, name, pluginId).release()));
 }
 

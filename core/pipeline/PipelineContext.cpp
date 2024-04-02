@@ -34,6 +34,7 @@ const string& PipelineContext::GetRegion() const {
     return mSLSInfo ? mSLSInfo->mRegion : sEmptyString;
 }
 
+// 如果是发往sls，返回logstore，否则构造一个假的
 LogstoreFeedBackKey PipelineContext::GetLogstoreKey() const {
     if (mSLSInfo) {
         return mSLSInfo->GetLogstoreKey();

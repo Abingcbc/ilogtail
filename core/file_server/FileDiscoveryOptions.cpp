@@ -145,6 +145,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config, const PipelineContext
                            ctx.GetLogstoreName(),
                            ctx.GetRegion());
     }
+    // 只支持一个文件路径
     if (mFilePaths.size() != 1) {
         PARAM_ERROR_RETURN(ctx.GetLogger(),
                            ctx.GetAlarm(),

@@ -53,6 +53,7 @@ InputFile::InputFile()
 bool InputFile::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
     string errorMsg;
 
+    // 配置文件发现相关的参数
     if (!mFileDiscovery.Init(config, *mContext, sName)) {
         return false;
     }
@@ -87,15 +88,18 @@ bool InputFile::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value
         mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(optionalGoPipeline, &mFileDiscovery);
     }
 
+    // 配置读取相关的参数
     if (!mFileReader.Init(config, *mContext, sName)) {
         return false;
     }
     mFileReader.mInputType = FileReaderOptions::InputType::InputFile;
 
     // 过渡使用
+    // tailing all matched file是什么意思？
     mFileDiscovery.SetTailingAllMatchedFiles(mFileReader.mTailingAllMatchedFiles);
 
     // Multiline
+    // 多行的配置
     const char* key = "Multiline";
     const Json::Value* itr = config.find(key, key + strlen(key));
     if (itr) {

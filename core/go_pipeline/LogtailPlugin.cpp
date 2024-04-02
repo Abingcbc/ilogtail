@@ -105,6 +105,7 @@ void LogtailPlugin::HoldOn(bool exitFlag) {
     if (mPluginValid && mHoldOnFun != NULL) {
         LOG_INFO(sLogger, ("Go pipelines pause", "starts"));
         auto holdOnStart = GetCurrentTimeInMilliSeconds();
+        // 调用cgo方法暂停go插件
         mHoldOnFun(exitFlag ? 1 : 0);
         auto holdOnCost = GetCurrentTimeInMilliSeconds() - holdOnStart;
         LOG_INFO(sLogger, ("Go pipelines pause", "succeeded")("cost", ToString(holdOnCost) + "ms"));
