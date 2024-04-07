@@ -112,6 +112,10 @@ func (p *FlusherStdout) Flush(projectName string, logstoreName string, configNam
 				}
 				writer.WriteObjectField("__time__")
 				writer.WriteString(strconv.Itoa(int(log.Time)))
+				if p.context.GetGlobalConfig().EnableTimestampNanosecond {
+					writer.WriteObjectField("__time_ns__")
+					writer.WriteString(strconv.Itoa(int(*log.TimeNs)))
+				}
 				writer.WriteObjectEnd()
 
 				if p.outLogger != nil {
