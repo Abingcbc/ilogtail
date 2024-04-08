@@ -41,6 +41,7 @@ void HistoryFileImporter::PushEvent(const HistoryFileEvent& event) {
 void HistoryFileImporter::Run() {
     while (true) {
         HistoryFileEvent event;
+        // 如果没有event，则会阻塞
         mEventQueue.PopItem(event);
         std::vector<std::string> objList;
         if (!GetAllFiles(event.mDirName, event.mFileName, objList)) {
@@ -59,6 +60,7 @@ void HistoryFileImporter::LoadCheckPoint() {
     }
 }
 
+// 历史文件采集
 void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std::vector<std::string>& fileNames) {
     static LogProcess* logProcess = LogProcess::GetInstance();
 

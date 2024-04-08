@@ -254,6 +254,7 @@ bool LogInput::ReadLocalEvents() {
             continue;
         }
 
+        // 构造历史采集事件
         HistoryFileEvent historyFileEvent;
         historyFileEvent.mDirName = source;
         historyFileEvent.mFileName = object;
@@ -281,6 +282,9 @@ bool LogInput::ReadLocalEvents() {
                                                readerConfig.second->GetLogstoreName(),
                                                readerConfig.second->GetRegion());
 
+        // 创建的时候就会启动一个线程，等待有事件被push到队列中
+        // 由于是静态的，所以只会启动一个线程
+        // 所以导入其实是串行的
         HistoryFileImporter* importer = HistoryFileImporter::GetInstance();
         importer->PushEvent(historyFileEvent);
     }
@@ -398,6 +402,7 @@ void* LogInput::ProcessLoop() {
             lastCheckBlockedTime = curTime;
         }
 
+        // 采集历史文件
         if (curTime - lastReadLocalEventTime >= INT32_FLAG(read_local_event_interval)) {
             ReadLocalEvents();
             lastReadLocalEventTime = curTime;

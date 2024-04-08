@@ -137,6 +137,7 @@ void PollingDirFile::Polling() {
             // PollingDirFile has to be held on at first because raw pointers are used here.
             vector<FileDiscoveryConfig> sortedConfigs;
             vector<FileDiscoveryConfig> wildcardConfigs;
+            // 获取所有的配置
             auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
             for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
                 if (itr->second.first->GetWildcardPaths().empty())

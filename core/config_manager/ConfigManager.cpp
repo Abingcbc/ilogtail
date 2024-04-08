@@ -243,6 +243,7 @@ bool ConfigManager::RegisterHandlers() {
     if (mSharedHandler == NULL) {
         mSharedHandler = new NormalEventHandler();
     }
+    // 根据配置中是否包含通配符路径，分别注册
     vector<FileDiscoveryConfig> sortedConfigs;
     vector<FileDiscoveryConfig> wildcardConfigs;
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
@@ -252,6 +253,7 @@ bool ConfigManager::RegisterHandlers() {
         else
             wildcardConfigs.push_back(itr->second);
     }
+    // 按照路径长度的顺序进行处理
     sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
     bool result = true;
     for (auto itr = sortedConfigs.begin(); itr != sortedConfigs.end(); ++itr) {
@@ -259,6 +261,7 @@ bool ConfigManager::RegisterHandlers() {
         if (!config->IsContainerDiscoveryEnabled()) {
             result &= RegisterHandlers(config->GetBasePath(), *itr);
         } else {
+            // 如果是容器，会注册所有容器的信息
             for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
                 result &= RegisterHandlers((*config->GetContainerInfo())[i].mRealBaseDir, *itr);
             }

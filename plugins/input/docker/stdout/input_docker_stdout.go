@@ -312,6 +312,7 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 				"id", info.IDPrefix(), "name", info.ContainerInfo.Name, "created", info.ContainerInfo.Created, "status", info.Status())
 			sds.addMetric.Add(1)
 			sds.synerMap[id] = syner
+			// 每个容器一个goroutine
 			syner.dockerFileReader.Start()
 		}
 	}

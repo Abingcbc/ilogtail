@@ -251,6 +251,7 @@ void Application::Start() {
             lastCheckTagsTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
+            // 配置发生变更
             ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!diff.IsEmpty()) {
                 // 这里会启动流水线
