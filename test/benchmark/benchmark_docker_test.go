@@ -28,7 +28,7 @@ func TestE2EOnDockerComposePerformance(t *testing.T) {
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"test_cases"},
-			Tags:     "@e2e-performance && @docker-compose && ~@ebpf",
+			Tags:     "@e2e-performance && @docker-compose && ~@ebpf && @enable",
 			TestingT: t,
 		},
 	}
