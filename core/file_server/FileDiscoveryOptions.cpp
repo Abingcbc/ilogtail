@@ -645,7 +645,7 @@ DockerContainerPath* FileDiscoveryOptions::GetContainerPathByLogPath(const strin
     if (!mContainerInfos) {
         return NULL;
     }
-    for (size_t i = 0; i < mContainerInfos->size(); ++i) {
+    for (int i = mContainerInfos->size() - 1; i >= 0; --i) {
         if (_IsSubPath((*mContainerInfos)[i].mContainerPath, logPath)) {
             return &(*mContainerInfos)[i];
         }

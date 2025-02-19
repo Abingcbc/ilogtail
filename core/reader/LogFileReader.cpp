@@ -113,6 +113,7 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           ? discoveryConfig.first->GetWildcardPaths()[0]
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mContainerPath.size());
+                reader->SetContainerID(containerPath->mID);
                 reader->AddExtraTags(containerPath->mContainerTags);
             }
         }
@@ -228,6 +229,7 @@ void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray
                                                mRealLogPath,
                                                mLogFileOp.IsOpen(),
                                                mContainerStopped,
+                                               mContainerID,
                                                mLastForceRead);
     // use last event time as checkpoint's last update time
     checkPointPtr->mLastUpdateTime = mLastEventTime;
@@ -281,16 +283,23 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             mLastFileSignatureSize = checkPointPtr->mSignatureSize;
             mRealLogPath = checkPointPtr->mRealFileName;
             mLastEventTime = checkPointPtr->mLastUpdateTime;
-            mContainerStopped = checkPointPtr->mContainerStopped;
+            if (checkPointPtr->mContainerID == mContainerID) {
+                mContainerStopped = checkPointPtr->mContainerStopped;
+            } else {
+                LOG_INFO(
+                    sLogger,
+                    ("container id is different between container discovery and checkpoint",
+                     checkPointPtr->mRealFileName)("checkpoint", checkPointPtr->mContainerID)("current", mContainerID));
+            }
             // new property to recover reader exactly from checkpoint
             mIdxInReaderArrayFromLastCpt = checkPointPtr->mIdxInReaderArray;
             LOG_INFO(sLogger,
                      ("recover log reader status from checkpoint, project", GetProject())("logstore", GetLogstore())(
-                         "config", GetConfigName())("log reader queue name", mHostLogPath)("file device",
-                                                                                           ToString(mDevInode.dev))(
-                         "file inode", ToString(mDevInode.inode))("file signature", mLastFileSignatureHash)(
-                         "file signature size", mLastFileSignatureSize)("real file path", mRealLogPath)(
-                         "last file position", mLastFilePos)("index in reader array", mIdxInReaderArrayFromLastCpt));
+                         "config", GetConfigName())("log reader queue name", mHostLogPath)(
+                         "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
+                         "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
+                         "real file path", mRealLogPath)("last file position", mLastFilePos)(
+                         "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID));
             // if file is open or
             // last update time is new and the file's container is not stopped we
             // we should use first modify
