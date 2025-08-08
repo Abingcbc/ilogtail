@@ -30,6 +30,7 @@
 #include <functional>
 #include <mutex>
 #include <queue>
+#include <shared_mutex>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -47,7 +48,7 @@ DECLARE_FLAG_INT32(system_interface_cache_entry_expire_seconds);
 namespace logtail {
 
 struct BaseInformation {
-    std::chrono::steady_clock::time_point collectTime;
+    time_t collectTime;
 };
 
 struct SystemInformation : public BaseInformation {
@@ -128,6 +129,8 @@ struct ProcessTime {
     std::chrono::milliseconds utime() const { return user - cutime; }
 
     std::chrono::milliseconds stime() const { return sys - cstime; }
+
+    time_t collectTime;
 };
 
 struct ProcessInfo {
@@ -621,7 +624,7 @@ public:
               mMaxCleanupCount(INT32_FLAG(system_interface_cache_max_cleanup_batch_size)),
               mCleanupInterval(std::chrono::seconds(INT32_FLAG(system_interface_cache_cleanup_interval_seconds))),
               mExpireThreshold(std::chrono::seconds(INT32_FLAG(system_interface_cache_entry_expire_seconds))) {}
-        bool Get(std::chrono::steady_clock::time_point now, InfoT& info, Args... args);
+        bool Get(time_t targetTime, InfoT& info, Args... args);
         bool Set(InfoT& info, Args... args);
         void PerformGarbageCollection();
         size_t GetCacheSize() const;
@@ -646,11 +649,11 @@ public:
     class SystemInformationCache<InfoT> {
     public:
         SystemInformationCache(size_t cacheSize) : mCacheSize(cacheSize) {}
-        bool Get(std::chrono::steady_clock::time_point now, InfoT& info);
+        bool Get(time_t targetTime, InfoT& info);
         bool Set(InfoT& info);
 
     private:
-        std::mutex mMutex;
+        mutable std::mutex mMutex;
         std::deque<InfoT> mCache;
         size_t mCacheSize;
 
@@ -667,25 +670,24 @@ public:
     static SystemInterface* GetInstance();
 
     bool GetSystemInformation(SystemInformation& systemInfo);
-    bool GetCPUInformation(std::chrono::steady_clock::time_point now, CPUInformation& cpuInfo);
-    bool GetProcessListInformation(std::chrono::steady_clock::time_point now, ProcessListInformation& processListInfo);
-    bool GetProcessInformation(std::chrono::steady_clock::time_point now, pid_t pid, ProcessInformation& processInfo);
-    bool GetSystemLoadInformation(std::chrono::steady_clock::time_point now, SystemLoadInformation& systemLoadInfo);
+    bool GetCPUInformation(time_t now, CPUInformation& cpuInfo);
+    bool GetProcessListInformation(time_t now, ProcessListInformation& processListInfo);
+    bool GetProcessInformation(time_t now, pid_t pid, ProcessInformation& processInfo);
+    bool GetSystemLoadInformation(time_t now, SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
-    bool GetHostMemInformationStat(std::chrono::steady_clock::time_point now, MemoryInformation& meminfo);
-    bool GetFileSystemListInformation(FileSystemListInformation& fileSystemListInfo);
-    bool GetSystemUptimeInformation(SystemUptimeInformation& systemUptimeInfo);
-    bool GetDiskSerialIdInformation(std::string diskName, SerialIdInformation& serialIdInfo);
-    bool GetDiskStateInformation(DiskStateInformation& diskStateInfo);
-    bool GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& cmdline);
-    bool GetPorcessStatm(pid_t pid, ProcessMemoryInformation& processMemory);
-    bool GetProcessCredNameObj(pid_t pid, ProcessCredName& credName);
-    bool GetExecutablePathCache(pid_t pid, ProcessExecutePath& executePath);
-    bool GetProcessOpenFiles(pid_t pid, ProcessFd& processFd);
+    bool GetHostMemInformationStat(time_t now, MemoryInformation& meminfo);
+    bool GetFileSystemListInformation(time_t now, FileSystemListInformation& fileSystemListInfo);
+    bool GetSystemUptimeInformation(time_t now, SystemUptimeInformation& systemUptimeInfo);
+    bool GetDiskSerialIdInformation(time_t now, std::string diskName, SerialIdInformation& serialIdInfo);
+    bool GetDiskStateInformation(time_t now, DiskStateInformation& diskStateInfo);
+    bool GetProcessCmdlineString(time_t now, pid_t pid, ProcessCmdlineString& cmdline);
+    bool GetPorcessStatm(time_t now, pid_t pid, ProcessMemoryInformation& processMemory);
+    bool GetProcessCredNameObj(time_t now, pid_t pid, ProcessCredName& credName);
+    bool GetExecutablePathCache(time_t now, pid_t pid, ProcessExecutePath& executePath);
+    bool GetProcessOpenFiles(time_t now, pid_t pid, ProcessFd& processFd);
 
-    bool GetTCPStatInformation(std::chrono::steady_clock::time_point now, TCPStatInformation& tcpStatInfo);
-    bool GetNetInterfaceInformation(std::chrono::steady_clock::time_point now,
-                                    NetInterfaceInformation& netInterfaceInfo);
+    bool GetTCPStatInformation(time_t now, TCPStatInformation& tcpStatInfo);
+    bool GetNetInterfaceInformation(time_t now, NetInterfaceInformation& netInterfaceInfo);
     explicit SystemInterface(size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
         : mSystemInformationCache(),
           mCPUInformationCache(cacheSize),
@@ -694,15 +696,15 @@ public:
           mSystemLoadInformationCache(cacheSize),
           mCPUCoreNumInformationCache(),
           mMemInformationCache(cacheSize),
-          mFileSystemListInformationCache(ttl),
-          mSystemUptimeInformationCache(ttl),
-          mSerialIdInformationCache(ttl),
-          mDiskStateInformationCache(ttl),
-          mProcessCmdlineCache(ttl),
-          mProcessStatmCache(ttl),
-          mProcessStatusCache(ttl),
-          mProcessFdCache(ttl),
-          mExecutePathCache(ttl),
+          mFileSystemListInformationCache(cacheSize),
+          mSystemUptimeInformationCache(cacheSize),
+          mSerialIdInformationCache(cacheSize),
+          mDiskStateInformationCache(cacheSize),
+          mProcessCmdlineCache(cacheSize),
+          mProcessStatmCache(cacheSize),
+          mProcessStatusCache(cacheSize),
+          mProcessFdCache(cacheSize),
+          mExecutePathCache(cacheSize),
           mTCPStatInformationCache(cacheSize),
           mNetInterfaceInformationCache(cacheSize) {}
     virtual ~SystemInterface() = default;
@@ -710,7 +712,7 @@ public:
 private:
     template <typename F, typename InfoT, typename... Args>
     bool MemoizedCall(SystemInformationCache<InfoT, Args...>& cache,
-                      std::chrono::steady_clock::time_point now,
+                      time_t now,
                       F&& func,
                       InfoT& info,
                       const std::string& errorType,

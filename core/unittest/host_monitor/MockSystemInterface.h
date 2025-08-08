@@ -37,7 +37,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        systemInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -46,7 +45,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        cpuInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -55,7 +53,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processListInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -64,7 +61,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -73,7 +69,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        systemLoadInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -82,7 +77,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        cpuCoreNumInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -90,7 +84,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        tcpStatInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -99,7 +92,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        netInterfaceInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -108,7 +100,6 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        meminfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
         return true;
     }
@@ -116,7 +107,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        cmdline.collectTime = std::chrono::steady_clock::now();
+        cmdline.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -125,7 +116,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processMemory.collectTime = std::chrono::steady_clock::now();
+        processMemory.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -134,7 +125,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processCredName.collectTime = std::chrono::steady_clock::now();
+        processCredName.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -143,7 +134,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        executePath.collectTime = std::chrono::steady_clock::now();
+        executePath.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -152,7 +143,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processFd.collectTime = std::chrono::steady_clock::now();
+        processFd.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -161,7 +152,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        fileSystemListInfo.collectTime = std::chrono::steady_clock::now();
+        fileSystemListInfo.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -170,7 +161,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        systemUptimeInfo.collectTime = std::chrono::steady_clock::now();
+        systemUptimeInfo.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -179,7 +170,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        serialIdInfo.collectTime = std::chrono::steady_clock::now();
+        serialIdInfo.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }
@@ -188,7 +179,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        diskStateInfo.collectTime = std::chrono::steady_clock::now();
+        diskStateInfo.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }

@@ -27,11 +27,30 @@ class BaseCollector {
 public:
     virtual ~BaseCollector() = default;
 
-    virtual bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) = 0;
-    virtual const std::string& Name() const = 0;
+    virtual bool Init(HostMonitorTimerEvent::CollectContext& collectContext) {
+        auto collectInterval = GetCollectInterval();
+        if (collectInterval.count() == 0) {
+            // Collector not support statistics metrics, set to 1
+            mCountPerReport = 1;
+            mCount = 0;
+            collectContext.mCollectInterval = collectContext.mReportInterval;
+            return true;
+        }
+        mCountPerReport = collectContext.mReportInterval.count() / collectInterval.count();
+        mCount = 0;
+        collectContext.mCollectInterval = collectInterval;
+        return true;
+    }
+    virtual bool Collect(const HostMonitorTimerEvent::CollectContext& collectContext, PipelineEventGroup* group) = 0;
+    [[nodiscard]] virtual const std::string& Name() const = 0;
+    [[nodiscard]] virtual const std::chrono::seconds GetCollectInterval() const = 0;
 
 protected:
     bool mValidState = true;
+
+    // basic multi-value metrics
+    int mCountPerReport = 0;
+    int mCount = 0;
 };
 
 } // namespace logtail

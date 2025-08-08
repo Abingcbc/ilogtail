@@ -16,31 +16,27 @@
 
 #include "host_monitor/collector/CPUCollector.h"
 
+#include <ctime>
+
 #include <string>
 
-#include "host_monitor/Constants.h"
+#include "Flags.h"
 #include "host_monitor/SystemInterface.h"
 
+DEFINE_FLAG_INT32(basic_host_monitor_cpu_collect_interval, "basic host monitor cpu collect interval, seconds", 5);
 namespace logtail {
 
 const std::string CPUCollector::sName = "cpu";
 
-CPUCollector::CPUCollector() {
-    Init();
-}
-int CPUCollector::Init(int totalCount) {
-    mCountPerReport = totalCount;
-    mCount = 0;
-    return 0;
-}
-bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectContext& collectContext, PipelineEventGroup* group) {
     if (group == nullptr) {
         LOG_ERROR(sLogger, ("PipelineEventGroup got nullptr", "skip"));
         return false;
     }
+    mCount++;
     CPUInformation cpuInfo;
     CPUPercent totalCpuPercent{};
-    if (!SystemInterface::GetInstance()->GetCPUInformation(collectConfig.mExecTime, cpuInfo)) {
+    if (!SystemInterface::GetInstance()->GetCPUInformation(collectContext.GetMetricTime(), cpuInfo)) {
         return false;
     }
 
@@ -67,7 +63,6 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 
         cpuCount = cpuInfo.stats.size() - 1;
         mCalculate.AddValue(totalCpuPercent);
-        mCount++;
 
         if (mCount < mCountPerReport) {
             return true;
@@ -95,7 +90,7 @@ bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         if (!metricEvent) {
             return false;
         }
-        metricEvent->SetTimestamp(collectConfig.mExecTime.time_since_epoch().count(), 0);
+        metricEvent->SetTimestamp(cpuInfo.collectTime, 0);
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         metricEvent->SetTag(std::string("m"), std::string("system.cpu"));
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
@@ -138,6 +133,10 @@ bool CPUCollector::CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& currentC
     cpuPercent.total = 100 - cpuPercent.idle;
     lastCpu = currentCpu;
     return true;
+}
+
+const std::chrono::seconds CPUCollector::GetCollectInterval() const {
+    return std::chrono::seconds(INT32_FLAG(basic_host_monitor_cpu_collect_interval));
 }
 
 } // namespace logtail
